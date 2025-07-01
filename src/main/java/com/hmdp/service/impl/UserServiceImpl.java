@@ -1,6 +1,7 @@
 package com.hmdp.service.impl;
 
 import cn.hutool.core.bean.BeanUtil;
+import cn.hutool.core.bean.copier.CopyOptions;
 import cn.hutool.core.lang.UUID;
 import cn.hutool.core.util.RandomUtil;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
@@ -13,10 +14,12 @@ import com.hmdp.service.IUserService;
 import com.hmdp.utils.RegexUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
 import javax.servlet.http.HttpSession;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 import static com.hmdp.utils.RedisConstants.*;
@@ -37,7 +40,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
     @Autowired
     private UserMapper userMapper;
     @Autowired
-    private RedisTemplate redisTemplate;
+    private StringRedisTemplate stringRedisTemplate;
 
     /**
      * 发送手机验证码
@@ -55,7 +58,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
         // 3.符合，生成验证码
         String code = RandomUtil.randomNumbers(6);
         // 4.保存验证码到redis
-        redisTemplate.opsForValue().set(LOGIN_CODE_KEY + phone, code, LOGIN_CODE_TTL, TimeUnit.MINUTES);
+        stringRedisTemplate.opsForValue().set(LOGIN_CODE_KEY + phone, code, LOGIN_CODE_TTL, TimeUnit.MINUTES);
         // 5.发送验证码（实际需调用第三方平台如阿里云实现发送短信）
         log.info("发送短信验证码成功，验证码：{}", code);
 
@@ -79,7 +82,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
             return Result.fail("手机号格式错误！");
         }
         // 3.校验验证码
-        String cacheCode = (String) redisTemplate.opsForValue().get(LOGIN_CODE_KEY + phone);
+        String cacheCode = stringRedisTemplate.opsForValue().get(LOGIN_CODE_KEY + phone);
         if (cacheCode == null || !code.equals(cacheCode)) {
             // 4.不一致，报错
             return Result.fail("验证码过期或错误！");
@@ -94,8 +97,12 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
         // 8.保存用户信息到redis中(生成随机token作为key并保存到前端作为后续请求鉴权依据，将user信息转换为hash结构存储)
         String token = UUID.randomUUID().toString(true);
         UserDTO userDTO = BeanUtil.copyProperties(user, UserDTO.class);
-        redisTemplate.opsForHash().putAll(LOGIN_USER_KEY + token, BeanUtil.beanToMap(userDTO));
-        redisTemplate.expire(LOGIN_USER_KEY + token, LOGIN_USER_TTL, TimeUnit.MINUTES);
+        Map<String, Object> userMap = BeanUtil.beanToMap(userDTO, new HashMap<>(),
+                CopyOptions.create().
+                        setIgnoreNullValue(true).
+                        setFieldValueEditor((fieldName, fieldValue)->fieldValue.toString()));
+        stringRedisTemplate.opsForHash().putAll(LOGIN_USER_KEY + token, userMap);
+        stringRedisTemplate.expire(LOGIN_USER_KEY + token, LOGIN_USER_TTL, TimeUnit.MINUTES);
 
         return Result.ok(token);
     }

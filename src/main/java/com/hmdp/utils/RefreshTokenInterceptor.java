@@ -3,7 +3,7 @@ package com.hmdp.utils;
 import cn.hutool.core.bean.BeanUtil;
 import com.baomidou.mybatisplus.core.toolkit.StringUtils;
 import com.hmdp.dto.UserDTO;
-import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.web.servlet.HandlerInterceptor;
 
 import javax.servlet.http.HttpServletRequest;
@@ -22,10 +22,10 @@ import static com.hmdp.utils.RedisConstants.LOGIN_USER_TTL;
  */
 public class RefreshTokenInterceptor implements HandlerInterceptor {
 
-    private final RedisTemplate redisTemplate;
+    private StringRedisTemplate stringRedisTemplate;
 
-    public RefreshTokenInterceptor(RedisTemplate redisTemplate) {
-        this.redisTemplate = redisTemplate;
+    public RefreshTokenInterceptor(StringRedisTemplate stringRedisTemplate) {
+        this.stringRedisTemplate = stringRedisTemplate;
     }
 
     @Override
@@ -36,7 +36,7 @@ public class RefreshTokenInterceptor implements HandlerInterceptor {
         if (StringUtils.isBlank(token)) {
             return true;
         }
-        Map<Object, Object> userMap = redisTemplate.opsForHash().entries(LOGIN_USER_KEY + token);
+        Map<Object, Object> userMap = stringRedisTemplate.opsForHash().entries(LOGIN_USER_KEY + token);
 
         // 3. 判断用户是否存在
         if (userMap.isEmpty()) {
@@ -47,7 +47,7 @@ public class RefreshTokenInterceptor implements HandlerInterceptor {
         // 5.存在，保存用户信息到ThreadLocal，方便controller层调用
         UserHolder.saveUser(userDTO);
         // 6.刷新token有效期
-        redisTemplate.expire(LOGIN_USER_KEY + token, LOGIN_USER_TTL, TimeUnit.MINUTES);
+        stringRedisTemplate.expire(LOGIN_USER_KEY + token, LOGIN_USER_TTL, TimeUnit.MINUTES);
         // 7.放行
         return true;
     }
