@@ -37,12 +37,12 @@ public class CacheClient {
 
     /**
      * 缓存空值解决缓存穿透
-     * @param keyPrefix
-     * @param id
-     * @param type
-     * @param dbFallBack
-     * @param time
-     * @param unit
+     * @param keyPrefix key的前缀
+     * @param id 商铺id
+     * @param type 实体类型
+     * @param dbFallBack 数据库查询方法
+     * @param time 过期时间
+     * @param unit 时间单位
      * @return
      * @param <R>
      * @param <ID>
